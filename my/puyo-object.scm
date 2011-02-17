@@ -12,20 +12,20 @@
 
 (define (boot-puyopuyo block)
   (let loop ((rensa 1)
-             (group (collect-groups block)))
+             (group (group-blocks block)))
     (when (pair? group)
-      (let1 newblock (apply-groups block group)
+      (let1 newblock (apply-grouped block group)
         (print-block newblock rensa)
-        (loop (+ rensa 1) (collect-groups newblock))))))
+        (loop (+ rensa 1) (group-blocks newblock))))))
 
-(define (apply-groups block groups)
+(define (apply-grouped block groups)
   (map
    (lambda (group)
-     (set! block (apply-group block group)))
+     (set! block (delete-block-cell block group)))
    groups)
   block)
 
-(define (apply-group block group)
+(define (delete-block-cell block group)
   (map
    (lambda (cell)
      (let* ((x (car cell))
@@ -38,7 +38,7 @@
        (when (eq? color #\space)
          (let ((line (list-ref block y)))
            (receive (newcolor orig-y)
-               (falling-to block x y)
+               (color-dropped-to block x y)
              (let1 line (list-ref block y)
                (set-cell! line x newcolor))
              (when orig-y
@@ -47,13 +47,13 @@
    (reverse block))
   block)
 
-(define (falling-to block x y)
+(define (color-dropped-to block x y)
   (let1 color (color-at block x y)
     (cond
      ((not (eq? color #\space))
       (values color y))
      ((> y 0)
-      (falling-to block x (- y 1)))
+      (color-dropped-to block x (- y 1)))
      (else
       (values #\space #f)))))
 
@@ -71,13 +71,13 @@
     (set! (car line) color)
     (set-cell! (cdr line) (- x 1) color)))
 
-(define (collect-groups block)
+(define (group-blocks block)
   (let ((done '())
         (grouped '()))
     (map-block
      (lambda (x y color)
        (unless (member (cons x y) done)
-         (let1 group (collect-group done block x y)
+         (let1 group (sequence-color done block x y)
            (set! done (append (cons (cons x y) done) group))
            (when (and (pair? group)
                       (>= (length group) 4))
@@ -85,7 +85,7 @@
      block)
     grouped))
 
-(define (collect-group history block x y)
+(define (sequence-color history block x y)
   (let1 color1 (color-at block x y)
     (if (member color1 '(#\G #\Y #\R))
       (fold
@@ -98,7 +98,7 @@
              (let1 newhist (cons (cons x y) history)
                (lset-union equal? 
                            newres
-                           (collect-group newhist block (car pair) (cdr pair))))))
+                           (sequence-color newhist block (car pair) (cdr pair))))))
           (else
            res)))
        '()
